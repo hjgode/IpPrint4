@@ -1,13 +1,19 @@
 package hgo.ipprint4;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.UUID;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
+
+import android.annotation.TargetApi;
+
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -17,6 +23,9 @@ import android.util.Log;
  * Created by hgode on 04.04.2014.
  */
 public class ipPrintFile {
+
+    private int socketPort=9100;
+
     public ipPrintFile(Context context, Handler handler)
     {
         log("ipPrintFile()");
@@ -25,21 +34,25 @@ public class ipPrintFile {
         //_btMAC=sBTmac;
         //_sFile=sFileName;
         mState=STATE_IDLE;
-        mAdapter=BluetoothAdapter.getDefaultAdapter();
+
+        //mAdapter=BluetoothAdapter.getDefaultAdapter();
+
         addText("ipPrintFile initialized 1");
     }
 
     // init a new btPrint with a conext for callbacks
     // the BT MAC as string and the file to be printed
-    public ipPrintFile(Handler handler, String sBTmac, String sFileName)
+    public ipPrintFile(Handler handler, String sIPaddr, String sFileName)
     {
         log("ipPrintFile()");
         //_context=context;
         mHandler=handler;
-        _btMAC=sBTmac;
+        _IPaddr=sIPaddr;
         _sFile=sFileName;
         mState=STATE_IDLE;
-        mAdapter=BluetoothAdapter.getDefaultAdapter();
+
+        //mAdapter=BluetoothAdapter.getDefaultAdapter();
+
         addText("ipPrintFile initialized 2");
     }
 
@@ -73,11 +86,11 @@ public class ipPrintFile {
     }
 
     public class MyRunnable implements Runnable{
-        private BluetoothSocket socket=null;
-        public MyRunnable(BluetoothSocket btSocket){
-            this.socket=btSocket;
-        }
-        public void run(){
+            private Socket socket=null;
+            public MyRunnable(Socket btSocket){
+                this.socket=btSocket;
+            }
+            public void run(){
 
         }
     	/*// usage
@@ -92,11 +105,10 @@ public class ipPrintFile {
     private static final boolean D = true;
 
     private Context _context=null;
-    private String	_btMAC="";
+    private String	_IPaddr="";
     private String _sFile="";
 
-    private final BluetoothAdapter mAdapter;
-    private BluetoothDevice mDevice=null;
+    private String mDevice=null;
 
     private Handler mHandler=null;
     private int mState;
@@ -170,7 +182,7 @@ public class ipPrintFile {
      * Start the ConnectThread to initiate a connection to a remote device.
      * @param device  The BluetoothDevice to connect
      */
-    public synchronized void connect(BluetoothDevice device) {
+    public synchronized void connect(String device) {
         if (D) Log.d(TAG, "connect to: " + device);
         addText("connecting to "+device);
         mDevice=device;
@@ -196,45 +208,54 @@ public class ipPrintFile {
      * succeeds or fails.
      */
     private class ConnectThread extends Thread {
-        private final BluetoothSocket mmSocket;
-        private final BluetoothDevice mmDevice;
+        private Socket mmSocket;
+        private InetAddress serverIP;
+        //private final BluetoothDevice mmDevice;
 
-        public ConnectThread(BluetoothDevice device) {
-            mmDevice = device;
-            BluetoothSocket tmp = null;
-
+        @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
+        public ConnectThread(String device) {
+           // mmDevice = device;
+            _IPaddr=device;
             // Get a BluetoothSocket for a connection with the
             // given BluetoothDevice
             try {
-                addText("createInsecureRfcommSocketToServiceRecord");
-                tmp = device.createInsecureRfcommSocketToServiceRecord(UUID_SPP);
+                addText("get host IP");
+                serverIP=InetAddress.getByName(_IPaddr);
                 //tmp = device.createRfcommSocketToServiceRecord(UUID_SPP);
-            } catch (IOException e) {
+            }catch (UnknownHostException e){
+                Log.e(TAG, "ConnectThread create() failed", e);
+            }
+            catch (IOException e) {
                 Log.e(TAG, "create() failed", e);
             }
-            mmSocket = tmp;
         }
 
         public void run() {
-            Log.i(TAG, "BEGIN mConnectThread");
+            Log.i(TAG, "ConnectThread::run()");
             setName("ConnectThread");
+            Socket tmp = null;
 
             // Always cancel discovery because it will slow down a connection
-            mAdapter.cancelDiscovery();
+            //mAdapter.cancelDiscovery();
 
             // Make a connection to the BluetoothSocket
             try {
                 // This is a blocking call and will only return on a
                 // successful connection or an exception
-                mmSocket.connect();
+                //mmSocket.connect();
+
+                addText("new Socket()");
+                tmp = new Socket(serverIP, socketPort); // device.createInsecureRfcommSocketToServiceRecord(UUID_SPP);
             } catch (IOException e) {
                 connectionFailed();
                 // Close the socket
                 try {
                     mmSocket.close();
+                    tmp=null;
                 } catch (IOException e2) {
                     Log.e(TAG, "unable to close() socket during connection failure", e2);
                 }
+                mmSocket = tmp;
                 // Start the service over to restart listening mode
                 ipPrintFile.this.start();
                 return;
@@ -246,7 +267,7 @@ public class ipPrintFile {
             }
 
             // Start the connected thread
-            connected(mmSocket, mmDevice);
+            connected(mmSocket);
         }
 
         public void cancel() {
@@ -263,11 +284,11 @@ public class ipPrintFile {
      * It handles all incoming and outgoing transmissions.
      */
     private class ConnectedThread extends Thread {
-        private final BluetoothSocket mmSocket;
+        private final Socket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
 
-        public ConnectedThread(BluetoothSocket socket) {
+        public ConnectedThread(Socket socket) {
             Log.d(TAG, "create ConnectedThread");
             mmSocket = socket;
             InputStream tmpIn = null;
@@ -336,9 +357,8 @@ public class ipPrintFile {
     /**
      * Start the ConnectedThread to begin managing a Bluetooth connection
      * @param socket  The BluetoothSocket on which the connection was made
-     * @param device  The BluetoothDevice that has been connected
      */
-    public synchronized void connected(BluetoothSocket socket, BluetoothDevice device) {
+    public synchronized void connected(Socket socket) {
         if (D) Log.d(TAG, "connected");
 
         // Cancel the thread that completed the connection
@@ -351,10 +371,17 @@ public class ipPrintFile {
         mConnectedThread = new ConnectedThread(socket);
         mConnectedThread.start();
 
+        //
+        String iAddress ="unknown host";
+        try {
+            iAddress = socket.getInetAddress().getHostName();
+        }catch(Exception e){
+
+        }
         // Send the name of the connected device back to the UI Activity
         Message msg = mHandler.obtainMessage(msgTypes.MESSAGE_DEVICE_NAME);
         Bundle bundle = new Bundle();
-        bundle.putString(msgTypes.DEVICE_NAME, device.getName());
+        bundle.putString(msgTypes.DEVICE_NAME, iAddress);
         msg.setData(bundle);
         mHandler.sendMessage(msg);
 

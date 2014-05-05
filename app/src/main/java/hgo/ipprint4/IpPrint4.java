@@ -1,8 +1,9 @@
 package hgo.ipprint4;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.Socket;
 import android.app.Activity;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Bundle;
@@ -23,9 +24,13 @@ import android.widget.*;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 
 public class IpPrint4 extends Activity {
     ipPrintFile ipPrintService = null;
@@ -59,7 +64,7 @@ public class IpPrint4 extends Activity {
     // Intent request codes for files list
     private static final int REQUEST_SELECT_FILE = 3;
 
-    BluetoothAdapter mBluetoothAdapter = null;
+    //BluetoothAdapter mBluetoothAdapter = null;
 
     View _view;
 
@@ -108,7 +113,7 @@ public class IpPrint4 extends Activity {
         });
 
         addLog("ipprint2 started");
-
+/*
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -118,7 +123,7 @@ public class IpPrint4 extends Activity {
             finish();
             return;
         }
-
+*/
         //exit button
         mBtnExit = (Button) findViewById(R.id.button1);
         mBtnExit.setOnClickListener(new OnClickListener() {
@@ -167,6 +172,8 @@ public class IpPrint4 extends Activity {
 
         //read file descriptions
         readPrintFileDescriptions();
+
+        getLocalIpAddress();
     }
 
 
@@ -174,7 +181,7 @@ public class IpPrint4 extends Activity {
     public void onStart() {
         super.onStart();
         if (D) Log.e(TAG, "++ ON START ++");
-
+/*
         if (mBluetoothAdapter != null) {
             // If BT is not on, request that it be enabled.
             // setupChat() will then be called during onActivityResult
@@ -183,11 +190,14 @@ public class IpPrint4 extends Activity {
                 startActivityForResult(enableIntent, REQUEST_ENABLE_BT);
                 // Otherwise, setup the comm session
             } else {
+*/
                 if (ipPrintService == null)
                     setupComm();
                 addLog("starting print service...");//if (mChatService == null) setupChat();
+/*
             }
         }
+*/
     }
 
     @Override
@@ -227,6 +237,33 @@ public class IpPrint4 extends Activity {
         // Stop the Bluetooth chat services
         if (ipPrintService != null) ipPrintService.stop();
         if (D) Log.e(TAG, "--- ON DESTROY ---");
+    }
+
+    public List<String> getLocalIpAddress()
+    {
+        List<String> ipList=new ArrayList<String>();
+        try
+        {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();)
+            {
+                NetworkInterface intf = en.nextElement();
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements();)
+                {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+                    if (!inetAddress.isLoopbackAddress())
+                    {
+                        Log.d(TAG, inetAddress.getHostAddress().toString());
+                        ipList.add(inetAddress.getHostAddress().toString());
+                        //return inetAddress.getHostAddress().toString();
+                    }
+                }
+            }
+        }
+        catch (SocketException ex)
+        {
+            Log.e(TAG, ex.toString());
+        }
+        return ipList;
     }
 
     void readPrintFileDescriptions() {
@@ -356,12 +393,14 @@ public class IpPrint4 extends Activity {
 
     private void ensureDiscoverable() {
         if (D) Log.d(TAG, "ensure discoverable");
+/*
         if (mBluetoothAdapter.getScanMode() !=
                 BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
             Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
             discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
             startActivity(discoverableIntent);
         }
+*/
     }
 
     public void addLog(String s) {
@@ -567,56 +606,25 @@ public class IpPrint4 extends Activity {
             return;
         }
 
-        String sMacAddr = remote;
-        if (sMacAddr.contains(":") == false && sMacAddr.length() == 12)
-        {
-            // If the MAC address only contains hex digits without the
-            // ":" delimiter, then add ":" to the MAC address string.
-            char[] cAddr = new char[17];
-
-            for (int i=0, j=0; i < 12; i += 2)
-            {
-                sMacAddr.getChars(i, i+2, cAddr, j);
-                j += 2;
-                if (j < 17)
-                {
-                    cAddr[j++] = ':';
-                }
-            }
-
-            sMacAddr = new String(cAddr);
-        }
-/*
-        //BT address is either 12 hex chars or
-        //6 pairs of hex chars with colons in between
-        if(remote.length()==12){
-            //insert colons
-            newRemote=  remote.substring(0,2) + ":" + remote.substring(2,2) + ":" + remote.substring(4,2) + ":" +
-                        remote.substring(6,2) + ":" + remote.substring(8,2) + ":" +remote.substring(10,2);
-
-        }
-        else
-            newRemote=remote;
-*/
-        BluetoothDevice device;
+        InetAddress iAddress;
         try {
-            device = mBluetoothAdapter.getRemoteDevice(sMacAddr);
-        }catch (Exception e){
-            myToast("Invalid BT MAC address");
-            device=null;
+            iAddress = InetAddress.getByName(remote);
+        }catch (UnknownHostException e){
+            myToast("Invalid IP host");
+            remote=null;
         }
 
-        if (device != null) {
-            addLog("connecting to " + sMacAddr);
-            ipPrintService.connect(device);
+        if (remote != null) {
+            addLog("connecting to " + remote);
+            ipPrintService.connect(remote);
         } else {
             addLog("unknown remote device!");
         }
     }
 
-    void connectToDevice(BluetoothDevice _device) {
+    void connectToDevice(String _device) {
         if (_device != null) {
-            addLog("connecting to " + _device.getAddress());
+            addLog("connecting to " + _device);
             ipPrintService.connect(_device);
         } else {
             addLog("unknown remote device!");
@@ -655,15 +663,11 @@ public class IpPrint4 extends Activity {
                 if (resultCode == Activity.RESULT_OK) {
                     addLog("resultCode==OK");
                     // Get the device MAC address
-                    String address = data.getExtras().getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
-                    addLog("onActivityResult: got device=" + address);
-                    // Get the BLuetoothDevice object
-                    BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
-                    mRemoteDevice.setText(device.getAddress());
+                    String address = mRemoteDevice.getText().toString();
                     // Attempt to connect to the device
                     addLog("onActivityResult: connecting device...");
                     //ipPrintService.connect(device);
-                    connectToDevice(device);
+                    connectToDevice(address);
                 }
                 bDiscoveryStarted = false;
                 break;
