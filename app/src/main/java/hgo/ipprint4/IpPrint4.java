@@ -34,7 +34,7 @@ public class IpPrint4 extends Activity {
     private EditText mRemoteDevice;
     Button mConnectButton;
     // Debugging
-    private static final String TAG = "btprint";
+    private static final String TAG = "ipprint";
     private static final boolean D = true;
 
     TextView mLog = null;
@@ -107,7 +107,7 @@ public class IpPrint4 extends Activity {
             }
         });
 
-        addLog("btprint2 started");
+        addLog("ipprint2 started");
 
         // Get local Bluetooth adapter
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -487,7 +487,7 @@ public class IpPrint4 extends Activity {
                     Bundle bundle = msg.getData();
                     int status = bundle.getInt("state");
                     if (D)
-                        Log.i(TAG, "handleMessage: MESSAGE_STATE_CHANGE: " + msg.arg1);  //arg1 was not used! by btPrintFile
+                        Log.i(TAG, "handleMessage: MESSAGE_STATE_CHANGE: " + msg.arg1);  //arg1 was not used! by ipprintFile
                     setConnectState(msg.arg1);
                     switch (msg.arg1) {
                         case ipPrintFile.STATE_CONNECTED:
