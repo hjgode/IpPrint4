@@ -4,8 +4,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -89,7 +91,7 @@ public class IpPrint4 extends Activity {
         mLog.setMovementMethod(ScrollingMovementMethod.getInstance());
 
         mRemoteDevice = (EditText) findViewById(R.id.remote_device);
-        mRemoteDevice.setText(R.string.bt_default_address);
+        mRemoteDevice.setText(R.string.ip_default_address);
         /* does not work to hide keypad
         mRemoteDevice.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
@@ -173,7 +175,19 @@ public class IpPrint4 extends Activity {
         //read file descriptions
         readPrintFileDescriptions();
 
-        getLocalIpAddress();
+        //is wifi enabled
+        if (!ipPrintFile.isNetworkOnline(this))
+            toggleWiFi(true);
+
+        List<String> ipList = getLocalIpAddress();
+        for (String s : ipList){
+            if (s.indexOf("%") != -1) {
+                //IP6 address
+                ;
+            } else {
+                addLog("Local IP: " + s);
+            }
+        }
     }
 
 
@@ -237,6 +251,16 @@ public class IpPrint4 extends Activity {
         // Stop the Bluetooth chat services
         if (ipPrintService != null) ipPrintService.stop();
         if (D) Log.e(TAG, "--- ON DESTROY ---");
+    }
+
+    public void toggleWiFi(boolean status) {
+        WifiManager wifiManager = (WifiManager) this
+                .getSystemService(Context.WIFI_SERVICE);
+        if (status == true && !wifiManager.isWifiEnabled()) {
+            wifiManager.setWifiEnabled(true);
+        } else if (status == false && wifiManager.isWifiEnabled()) {
+            wifiManager.setWifiEnabled(false);
+        }
     }
 
     public List<String> getLocalIpAddress()

@@ -2,17 +2,22 @@ package hgo.ipprint4;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import android.annotation.TargetApi;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -25,6 +30,7 @@ import android.util.Log;
 public class ipPrintFile {
 
     private int socketPort=9100;
+    private int iTimeOut=5000;
 
     public ipPrintFile(Context context, Handler handler)
     {
@@ -38,6 +44,25 @@ public class ipPrintFile {
         //mAdapter=BluetoothAdapter.getDefaultAdapter();
 
         addText("ipPrintFile initialized 1");
+    }
+
+    public static boolean isNetworkOnline(Context context) {
+        boolean status=false;
+        try{
+            ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo netInfo = cm.getNetworkInfo(0);
+            if (netInfo != null && netInfo.getState()==NetworkInfo.State.CONNECTED) {
+                status= true;
+            }else {
+                netInfo = cm.getNetworkInfo(1);
+                if(netInfo!=null && netInfo.getState()==NetworkInfo.State.CONNECTED)
+                    status= true;
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+            return false;
+        }
+        return status;
     }
 
     // init a new btPrint with a conext for callbacks
@@ -55,7 +80,6 @@ public class ipPrintFile {
 
         addText("ipPrintFile initialized 2");
     }
-
     /**
      * Start the chat service. Specifically start AcceptThread to begin a
      * session in listening (server) mode. Called by the Activity onResume() */
@@ -83,20 +107,6 @@ public class ipPrintFile {
         if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
         setState(STATE_DISCONNECTED);
         addText("stop() done.");
-    }
-
-    public class MyRunnable implements Runnable{
-            private Socket socket=null;
-            public MyRunnable(Socket btSocket){
-                this.socket=btSocket;
-            }
-            public void run(){
-
-        }
-    	/*// usage
-    	Thread t = new Thread(new MyRunnable(parameter));
-   		t.start();
-    	*/
     }
 
     //vars
@@ -189,7 +199,11 @@ public class ipPrintFile {
         // Cancel any thread attempting to make a connection
         if (mState == STATE_CONNECTING) {
             addText("already connected. Disconnecting first");
-            if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
+            if (mConnectThread != null)
+            {
+                mConnectThread.cancel();
+                mConnectThread = null;
+            }
         }
 
         // Cancel any thread currently running a connection
@@ -208,63 +222,109 @@ public class ipPrintFile {
      * succeeds or fails.
      */
     private class ConnectThread extends Thread {
-        private Socket mmSocket;
+        private Socket mmSocket=null;
         private InetAddress serverIP;
+        private SocketAddress socketAddress=null;
+
         //private final BluetoothDevice mmDevice;
 
         @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
-        public ConnectThread(String device) {
-           // mmDevice = device;
-            _IPaddr=device;
-            // Get a BluetoothSocket for a connection with the
-            // given BluetoothDevice
+        public ConnectThread(String sIPremote) {
+            _IPaddr=sIPremote;
             try {
                 addText("get host IP");
                 serverIP=InetAddress.getByName(_IPaddr);
+                socketAddress=new InetSocketAddress(serverIP, socketPort);
                 //tmp = device.createRfcommSocketToServiceRecord(UUID_SPP);
             }catch (UnknownHostException e){
                 Log.e(TAG, "ConnectThread create() failed", e);
             }
             catch (IOException e) {
-                Log.e(TAG, "create() failed", e);
+                Log.e(TAG, "ConnectThread create() failed", e);
             }
         }
-
+        @Override
         public void run() {
             Log.i(TAG, "ConnectThread::run()");
             setName("ConnectThread");
             Socket tmp = null;
 
-            // Always cancel discovery because it will slow down a connection
-            //mAdapter.cancelDiscovery();
-
-            // Make a connection to the BluetoothSocket
+            // Make a connection to the Socket
             try {
+                //TEST portScanner
+                PortScanner portScanner=new PortScanner("");
+
+                addText("new Socket()...");
                 // This is a blocking call and will only return on a
                 // successful connection or an exception
-                //mmSocket.connect();
-
-                addText("new Socket()");
-                tmp = new Socket(serverIP, socketPort); // device.createInsecureRfcommSocketToServiceRecord(UUID_SPP);
-            } catch (IOException e) {
+                //tmp=new Socket(serverIP, socketPort);
+                tmp=new Socket();
+                tmp.connect(socketAddress, iTimeOut);
+                addText("new socket() done");
+                mmSocket=tmp;
+            }
+            catch(IllegalArgumentException e){
+                addText("IllegalArgumentException: " + e.getMessage());
+                //if new Socket() failed
                 connectionFailed();
-                // Close the socket
-                try {
-                    mmSocket.close();
-                    tmp=null;
-                } catch (IOException e2) {
-                    Log.e(TAG, "unable to close() socket during connection failure", e2);
+                addText("Connect failed");
+                if(mmSocket!=null) {
+                    // Close the socket
+                    try {
+                        mmSocket.close();
+                        tmp = null;
+                    } catch (IOException e2) {
+                        Log.e(TAG, "unable to close() socket during connection failure", e2);
+                    }
                 }
-                mmSocket = tmp;
                 // Start the service over to restart listening mode
-                ipPrintFile.this.start();
+//                ipPrintFile.this.start();
                 return;
             }
+            catch (IOException e){
+                addText("IOException: " + e.getMessage());
+                //if new Socket() failed
+                connectionFailed();
+                addText("Connect failed");
+                if(mmSocket!=null) {
+                    // Close the socket
+                    try {
+                        mmSocket.close();
+                        tmp = null;
+                    } catch (IOException e2) {
+                        Log.e(TAG, "unable to close() socket during connection failure", e2);
+                    }
+                }
+                // Start the service over to restart listening mode
+//                ipPrintFile.this.start();
+                return;
+            }
+            catch (Exception e) {
+                //if new Socket() failed
+                connectionFailed();
+                addText("Connect failed");
+                if(mmSocket!=null) {
+                    // Close the socket
+                    try {
+                        mmSocket.close();
+                        tmp = null;
+                    } catch (IOException e2) {
+                        Log.e(TAG, "unable to close() socket during connection failure", e2);
+                    }
+                }
+                // Start the service over to restart listening mode
+                /*
+                ipPrintFile.this.start();
+                */
+                return;
+            }//catch
 
             // Reset the ConnectThread because we're done
             synchronized (ipPrintFile.this) {
                 mConnectThread = null;
             }
+            // start listening mode
+            ipPrintFile.this.start();
 
             // Start the connected thread
             connected(mmSocket);
@@ -348,8 +408,11 @@ public class ipPrintFile {
         public void cancel() {
             addText("cancel");
             try {
-                mmSocket.close();
-            } catch (IOException e) {
+                if(mmSocket!=null)
+                    mmSocket.close();
+            }catch (NullPointerException e){
+                Log.e(TAG, "close() of connect socket failed", e);
+            }catch (IOException e) {
                 Log.e(TAG, "close() of connect socket failed", e);
             }
         }
@@ -434,11 +497,18 @@ public class ipPrintFile {
     }
     //helpers
     void addText(String s){
-        Message msg = mHandler.obtainMessage(msgTypes.MESSAGE_INFO);
-        Bundle bundle = new Bundle();
-        bundle.putString(msgTypes.INFO , "INFO: " + s);
-        msg.setData(bundle);
-        mHandler.sendMessage(msg);
+        try{
+            Message msg = mHandler.obtainMessage(msgTypes.MESSAGE_INFO);
+            Bundle bundle = new Bundle();
+            bundle.putString(msgTypes.INFO , "INFO: " + s);
+            msg.setData(bundle);
+            mHandler.sendMessage(msg);
+        }catch(NullPointerException e){
+            ;
+        }
+        catch (Exception e){
+            ;
+        }
     }
     void addText(String msgType, int state){
         // Give the new state to the Handler so the UI Activity can update
