@@ -1,5 +1,9 @@
 package hgo.ipprint4;
 
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Message;
 import android.util.Log;
 
 import java.net.InetSocketAddress;
@@ -12,14 +16,31 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by hgode on 06.05.2014.
  */
 public class PortScanner {
 
-    PortScanner(String startIP){
-        test(startIP);
+    private Handler mHandler=null;
+
+    String TAG = "portscanner";
+    String m_sStartIP="192.168.128.0";
+    enum eState{
+        idle,
+        running,
+        finished,
+        error
+    }
+
+    eState state=eState.idle;
+    final ExecutorService es=Executors.newFixedThreadPool(20);
+
+    PortScanner(Handler handler, String startIP){
+        mHandler=handler;
+        m_sStartIP=startIP;
+        //test(startIP);
     }
 
     public static class ScanResult {
@@ -36,7 +57,10 @@ public class PortScanner {
         public ScanResult get(){
             return this;
         }
-
+        @Override
+        public String toString(){
+            return sIP;
+        }
     }
 
     public static Future<ScanResult> portIsOpen(final ExecutorService es, final String ip, final int port, final int timeout) {
@@ -52,6 +76,105 @@ public class PortScanner {
                 }
             }
         });
+    }
+
+    public void cancelDiscovery(){
+        if(state==eState.idle)
+            return;
+        es.shutdown();
+        try {
+            // Wait a while for existing tasks to terminate
+            if (!es.awaitTermination(60, TimeUnit.SECONDS)) {
+                es.shutdownNow(); // Cancel currently executing tasks
+                // Wait a while for tasks to respond to being cancelled
+                if (!es.awaitTermination(60, TimeUnit.SECONDS))
+                    System.err.println("Pool did not terminate");
+            }
+        }catch(InterruptedException ie){
+            // (Re-)Cancel if current thread also interrupted
+            es.shutdownNow();
+            // Preserve interrupt status
+            Thread.currentThread().interrupt();
+        }
+        state=eState.finished;
+        Message msg = mHandler.obtainMessage(msgTypes.finished);
+        Bundle bundle = new Bundle();
+        msg.setData(bundle);
+        mHandler.sendMessage(msg);
+
+    }
+
+    public void startDiscovery(){
+        if(state!=eState.idle)
+            return;
+        state=eState.running;
+        // Send the name of the connected device back to the UI Activity
+        Message msg = mHandler.obtainMessage(msgTypes.started);
+        Bundle bundle = new Bundle();
+        msg.setData(bundle);
+        mHandler.sendMessage(msg);
+
+        //final ExecutorService es = Executors.newFixedThreadPool(20);
+        //final String ip = m_sStartIP;//"127.0.0.1";
+        String baseIP;
+
+        final int timeout = 200;
+        final List<Future<ScanResult>> futures = new ArrayList<Future<ScanResult>>();
+        /*
+        //for (int port = 1; port <= 65535; port++) {
+        for (int port = 1; port <= 1024; port++) {
+            futures.add(portIsOpen(es, ip, port, timeout));
+        }
+        */
+
+        String[] ss = m_sStartIP.split("\\.");
+        if(ss.length!=4){   //no regular IP
+            state=eState.finished;
+            msg = mHandler.obtainMessage(hgo.ipprint4.msgTypes.MESSAGE_TOAST);
+            bundle = new Bundle();
+            bundle.putString(hgo.ipprint4.msgTypes.TOAST, "inavlid IP");
+            msg.setData(bundle);
+            mHandler.sendMessage(msg);
+            return;
+        }
+        baseIP=ss[0]+"."+ss[1]+"."+ss[2];
+        int port=9100;
+        for (int ip1=1; ip1<=254; ip1++){
+            String sip=String.format(baseIP + ".%03d", ip1);
+            futures.add(portIsOpen(es, sip, port, timeout));
+        }
+        es.shutdown();
+        int openPorts = 0;
+        for (final Future<ScanResult> f : futures) {
+            try {
+                if (f.get().isOpen) {
+                    openPorts++;
+                    Log.i("portScan:", f.get().sIP + " 9100 open");
+                    // Send the name of the connected device back to the UI Activity
+                    msg = mHandler.obtainMessage(msgTypes.addHost);
+                    bundle = new Bundle();
+                    bundle.putString(msgTypes.HOST_NAME, f.get().sIP);
+                    msg.setData(bundle);
+                    mHandler.sendMessage(msg);
+                    doLog("added host msg for " + f.get().sIP);
+                }
+                else{
+                    Log.i("portScan:", f.get().sIP + " 9100 closed");
+                }
+            }
+            catch(ExecutionException e){
+                doLog("ExecutionException: "+e.getMessage());
+            }
+            catch(InterruptedException e){
+                doLog("InterruptedException: "+e.getMessage());
+            }
+        }
+        doLog("There are " + openPorts + " open ports on host " + m_sStartIP + "/24 (probed with a timeout of " + timeout + "ms)");
+        state=eState.idle;
+        msg = mHandler.obtainMessage(msgTypes.finished);
+        bundle = new Bundle();
+        msg.setData(bundle);
+        mHandler.sendMessage(msg);
     }
 
     static void test(String sIP){
@@ -90,6 +213,8 @@ public class PortScanner {
             }
         }
         System.out.println("There are " + openPorts + " open ports on host " + ip + " (probed with a timeout of " + timeout + "ms)");
-
+    }
+    void doLog(String s){
+        Log.i(TAG, s);
     }
 }

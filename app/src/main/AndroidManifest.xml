@@ -31,7 +31,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="hgo.ipprint4.DeviceListActivity"
+            android:name="hgo.ipprint4.ipListActivity"
             android:configChanges="orientation|keyboardHidden"
             android:label="@string/select_device"
             android:theme="@android:style/Theme.Dialog" />

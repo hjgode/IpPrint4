@@ -251,8 +251,6 @@ public class ipPrintFile {
 
             // Make a connection to the Socket
             try {
-                //TEST portScanner
-                PortScanner portScanner=new PortScanner("");
 
                 addText("new Socket()...");
                 // This is a blocking call and will only return on a
@@ -379,6 +377,10 @@ public class ipPrintFile {
 
                     // Send the obtained bytes to the UI Activity
                     mHandler.obtainMessage(msgTypes.MESSAGE_READ, bytes, -1, buffer).sendToTarget();
+                } catch (SocketException e) {
+                    Log.e(TAG, "socket exception", e);
+                    connectionLost();
+                    break;
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     connectionLost();

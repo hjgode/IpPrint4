@@ -462,7 +462,11 @@ public class IpPrint4 extends Activity {
             return;
         bDiscoveryStarted = true;
         // Launch the DeviceListActivity to see devices and do scan
-        Intent serverIntent = new Intent(this, DeviceListActivity.class);
+
+        //Intent serverIntent = new Intent(this, DeviceListActivity.class);
+        //startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+
+        Intent serverIntent = new Intent(this, ipListActivity.class);
         startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
     }
 
@@ -681,7 +685,7 @@ public class IpPrint4 extends Activity {
                 }
                 bFileListStared = false;
                 break;
-            case REQUEST_CONNECT_DEVICE:
+            case REQUEST_CONNECT_DEVICE:    //called from List activity with new device/host address
                 addLog("onActivityResult: requestCode==REQUEST_CONNECT_DEVICE");
                 // When DeviceListActivity returns with a device to connect
                 if (resultCode == Activity.RESULT_OK) {
