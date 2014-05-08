@@ -13,6 +13,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.AdapterView.OnItemClickListener;
 
 /**
  * Created by E841719 on 07.05.2014.
@@ -38,6 +39,8 @@ public class ipListActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
+
         addLog("+++OnCreate+++");
         // Setup the window
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
@@ -52,19 +55,29 @@ public class ipListActivity extends Activity {
         // Find and set up the ListView for paired devices
         ListView hostsListView = (ListView) findViewById(R.id.hostsListView);
         hostsListView.setAdapter(mRemotesArrayAdapter);
+        hostsListView.setOnItemClickListener(mDeviceClickListener);
 
+        portScanner=new PortScanner(mHandler, "192.168.128.1");
+
+        portScanner.startDiscovery();
+
+        // Initialize the button to perform device discovery
+        scanButtonTextScan=getResources().getString(R.string.devicelist_action_button_text_scan);
+        scanButtonTextStop=getResources().getString(R.string.devicelist_action_button_text_cancel);
         scanButton=(Button)findViewById(R.id.scanButton);
         scanButton.setText(scanButtonTextScan);
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
+                if(portScanner.state== PortScanner.eState.finished || portScanner.state== PortScanner.eState.idle) {
+                    mRemotesArrayAdapter.clear();
+                    portScanner.startDiscovery();
+                }
+                else if (portScanner.state== PortScanner.eState.running)
+                    portScanner.cancelDiscovery();
             }
         });
 
-        portScanner=new PortScanner(mHandler, "192.168.128.1");
-
-        portScanner.startDiscovery();
     }
 
     // The on-click listener for all devices in the ListViews
@@ -98,16 +111,23 @@ public class ipListActivity extends Activity {
                     Bundle bundle = msg.getData();
                     String sHost = bundle.getString(msgTypes.HOST_NAME);
                     mRemotesArrayAdapter.add(new PortScanner.ScanResult(sHost, 9100, true));
+                    mRemotesArrayAdapter.notifyDataSetChanged();
                     addLog("msg got host_name: " + sHost);
                     break;
                 case msgTypes.finished:
+                    setProgressBarIndeterminateVisibility(false);
                     addLog("msg received: finished");
+                    scanButton.setText(scanButtonTextScan);
                     break;
                 case msgTypes.started:
+                    setProgressBarIndeterminateVisibility(true);
                     addLog("msg received: started");
+                    scanButton.setText(scanButtonTextStop);
                     break;
                 case msgTypes.stopped:
+                    setProgressBarIndeterminateVisibility(false);
                     addLog("msg received: stopped");
+                    scanButton.setText(scanButtonTextScan);
                     break;
             }
         }

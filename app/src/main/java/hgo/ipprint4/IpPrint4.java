@@ -699,6 +699,7 @@ public class IpPrint4 extends Activity {
                 }
                 bDiscoveryStarted = false;
                 break;
+/*
             case REQUEST_ENABLE_BT:
                 addLog("requestCode==REQUEST_ENABLE_BT");
                 // When the request to enable Bluetooth returns
@@ -713,6 +714,7 @@ public class IpPrint4 extends Activity {
                     Toast.makeText(this, R.string.bt_not_enabled_leaving, Toast.LENGTH_SHORT).show();
                     finish();
                 }
+*/
         }
     }
 
