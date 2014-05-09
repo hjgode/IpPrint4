@@ -33,12 +33,13 @@ public class PortScanner implements Runnable{
 
     eState state=eState.idle;
 
-    //final ExecutorService es=Executors.newFixedThreadPool(20);
+    final ExecutorService es=Executors.newFixedThreadPool(20);
 
     Message msg;
     Bundle bundle;
-    String baseIP;
+    String baseIP="192.168.128";
     int port=9100;
+    boolean bValidIP=false;
 
     //contructor
     PortScanner(Handler handler, String startIP){
@@ -55,6 +56,7 @@ public class PortScanner implements Runnable{
             mHandler.sendMessage(msg);
             return;
         }
+        bValidIP=true;
         baseIP=ss[0]+"."+ss[1]+"."+ss[2];
         state=eState.idle;
     }
@@ -81,16 +83,29 @@ public class PortScanner implements Runnable{
 
     @Override
     public void run() {
-        if(state!=eState.idle)
+        doLog("thread: run()...");
+        if(state!=eState.idle) {
+            doLog("thread: run() ended as state!=idle");
             return;
+        }
         state=eState.running;
         ScanResult scanResult;
         try {
-            Log.i(TAG,"Thread starting.");
+            doLog("thread: starting...");
             msg=mHandler.obtainMessage(msgTypes.started);
             mHandler.sendMessage(msg);
             if( !backgroundThread.interrupted() ) {
-                //startDiscovery();
+                doLog("thread: starting discovery...");
+                startDiscovery1();
+                //wait for finish
+                Thread.sleep(1000);
+                doLog("thread: waiting for finish...");
+                while(state!=state.idle) {
+                    Thread.sleep(1000);
+                }
+                doLog("thread: wait finished");
+                /*
+                //scanning 250 addresses with 200ms each will take 50 seconds if done one by one!
                 for (int ip1=1; ip1<=254; ip1++){
                     String sip=String.format(baseIP + ".%03d", ip1);
                     scanResult = portIsOpen1(sip, port, timeout);
@@ -110,37 +125,56 @@ public class PortScanner implements Runnable{
                     if(backgroundThread.interrupted())
                         break;
                 }
+                */
             }
-            Log.i(TAG, "Thread stopping.");
+            doLog("thread: interrupted");
         } catch( Exception ex ) {
             // important you respond to the InterruptedException and stop processing
             // when its thrown!  Notice this is outside the while loop.
-            Log.i(TAG,"Thread shutting down as it was requested to stop.");
+            doLog("Thread shutting down as it was requested to stop.");
         } finally {
             backgroundThread = null;
         }
+        /*
         state=eState.idle;
         msg=mHandler.obtainMessage(msgTypes.finished);
         mHandler.sendMessage(msg);
+        */
+        doLog("thread: run() ended");
     }
 
     public void startDiscovery(){
-        this.start();
+        doLog("startDiscovery");
+        if(bValidIP) {
+            doLog("startDiscovery: checked bValidIP");
+            this.start();
+        }
+        doLog("startDiscovery END");
     }
     public void start() {
+        doLog("start()...");
         if( backgroundThread == null ) {
+            doLog("start: backgroundThread == null");
             backgroundThread = new Thread( this );
+            doLog("start: starting new backgroundThread");
             backgroundThread.start();
         }
+        doLog("start() END");
     }
 
     public void cancelDiscovery(){
+        doLog("cancelDiscovery()...");
         this.stop();
+        doLog("cancelDiscovery() END");
     }
     public void stop() {
+        doLog("stop()...");
+        cancelDiscovery1();
         if( backgroundThread != null ) {
+            doLog("backgroundThread != null. trying interrupt()");
             backgroundThread.interrupt();
         }
+        doLog("stop() END");
     }
 
     enum eState{
@@ -159,13 +193,13 @@ public class PortScanner implements Runnable{
             socket.close();
             scanResult = new ScanResult(sIp, p, true);// true;
         } catch (Exception ex) {
-            Log.i(TAG, "Exception in scan for " + sIp + "/" + p);
+            doLog("Exception in portIsOpen1 for " + sIp + "/" + p);
             //return new ScanResult(ip, port, false);// false;
         }
         return  scanResult;
     }
 
-/*
+
     public static Future<ScanResult> portIsOpen(final ExecutorService es, final String ip, final int port, final int timeout) {
         return es.submit(new Callable<ScanResult>() {
             @Override public ScanResult call() {
@@ -182,10 +216,15 @@ public class PortScanner implements Runnable{
     }
 
     public void cancelDiscovery1(){
-        if(state==eState.idle)
+        doLog("cancelDiscovery1()...");
+        if(state==eState.idle) {
+            doLog("cancelDiscovery1: abort as state!=idle");
             return;
+        }
+        doLog("cancelDiscovery1: stutdown ExecutorService");
         es.shutdown();
         try {
+            doLog("cancelDiscovery1: waiting for es.shutdown...");
             // Wait a while for existing tasks to terminate
             if (!es.awaitTermination(60, TimeUnit.SECONDS)) {
                 es.shutdownNow(); // Cancel currently executing tasks
@@ -193,34 +232,34 @@ public class PortScanner implements Runnable{
                 if (!es.awaitTermination(60, TimeUnit.SECONDS))
                     System.err.println("Pool did not terminate");
             }
+            doLog("cancelDiscovery1: es terminated");
         }catch(InterruptedException ie){
             // (Re-)Cancel if current thread also interrupted
+            doLog("cancelDiscovery1: trying es.shutdownNow...");
             es.shutdownNow();
             // Preserve interrupt status
+            doLog("cancelDiscovery1: Preserve interrupt status");
             Thread.currentThread().interrupt();
         }
-        state=eState.finished;
+        doLog("cancelDiscovery1: set state=finished");
+//        state=eState.finished;
         Message msg = mHandler.obtainMessage(msgTypes.finished);
         Bundle bundle = new Bundle();
         msg.setData(bundle);
         mHandler.sendMessage(msg);
-
+        state=eState.idle;
+        doLog("cancelDiscovery1: END");
     }
 
     public void startDiscovery1(){
-
-        if(state!=eState.idle)
-            return;
+        doLog("startDiscovery1()...");
+//        if(state!=eState.idle)
+//            return;
+        doLog("startDiscovery1: setting state=running");
         state=eState.running;
         // Send the name of the connected device back to the UI Activity
         Message msg = mHandler.obtainMessage(msgTypes.started);
-        Bundle bundle = new Bundle();
-        msg.setData(bundle);
         mHandler.sendMessage(msg);
-
-        //final ExecutorService es = Executors.newFixedThreadPool(20);
-        //final String ip = m_sStartIP;//"127.0.0.1";
-        String baseIP;
 
         final int timeout = 200;
         final List<Future<ScanResult>> futures = new ArrayList<Future<ScanResult>>();
@@ -230,7 +269,7 @@ public class PortScanner implements Runnable{
         //    futures.add(portIsOpen(es, ip, port, timeout));
         //}
         //
-
+/*
         String[] ss = m_sStartIP.split("\\.");
         if(ss.length!=4){   //no regular IP
             state=eState.finished;
@@ -243,14 +282,17 @@ public class PortScanner implements Runnable{
         }
         baseIP=ss[0]+"."+ss[1]+"."+ss[2];
         int port=9100;
-
+*/
+        //start many threads for scanning
+        doLog("startDiscovery1: starting futures...");
         for (int ip1=1; ip1<=254; ip1++){
             String sip=String.format(baseIP + ".%03d", ip1);
             futures.add(portIsOpen(es, sip, port, timeout));
         }
-
+        doLog("startDiscovery1: es.shutdown()");
         es.shutdown();
         int openPorts = 0;
+        doLog("startDiscovery1 getting results...");
         for (final Future<ScanResult> f : futures) {
             try {
                 if (f.get().isOpen) {
@@ -275,14 +317,13 @@ public class PortScanner implements Runnable{
                 doLog("InterruptedException: "+e.getMessage());
             }
         }
-        doLog("There are " + openPorts + " open ports on host " + m_sStartIP + "/24 (probed with a timeout of " + timeout + "ms)");
+        doLog("startDiscovery1: found " + openPorts + " open ports on host " + m_sStartIP + "/24 (probed with a timeout of " + timeout + "ms)");
         msg = mHandler.obtainMessage(msgTypes.finished);
-        bundle = new Bundle();
-        msg.setData(bundle);
         mHandler.sendMessage(msg);
         state=eState.idle;
+        doLog("startDiscovery1: END");
     }
-*/
+
 /*
     static void test(String sIP){
         final ExecutorService es = Executors.newFixedThreadPool(20);
