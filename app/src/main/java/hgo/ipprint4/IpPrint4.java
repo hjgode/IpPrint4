@@ -1,5 +1,6 @@
 package hgo.ipprint4;
 
+import java.lang.reflect.Array;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
@@ -90,8 +91,6 @@ public class IpPrint4 extends Activity {
         mLog = (TextView) findViewById(R.id.log);
         mLog.setMovementMethod(ScrollingMovementMethod.getInstance());
 
-        mRemoteDevice = (EditText) findViewById(R.id.remote_device);
-        mRemoteDevice.setText(R.string.ip_default_address);
         /* does not work to hide keypad
         mRemoteDevice.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
@@ -115,17 +114,7 @@ public class IpPrint4 extends Activity {
         });
 
         addLog("ipprint2 started");
-/*
-        // Get local Bluetooth adapter
-        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        // If the adapter is null, then Bluetooth is not supported
-        if (mBluetoothAdapter == null) {
-            Toast.makeText(this, "Bluetooth is not available", Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
-*/
         //exit button
         mBtnExit = (Button) findViewById(R.id.button1);
         mBtnExit.setOnClickListener(new OnClickListener() {
@@ -178,16 +167,13 @@ public class IpPrint4 extends Activity {
         //is wifi enabled
         if (!ipPrintFile.isNetworkOnline(this))
             toggleWiFi(true);
-
-        List<String> ipList = getLocalIpAddress();
-        for (String s : ipList){
-            if (s.indexOf("%") != -1) {
-                //IP6 address
-                ;
-            } else {
-                addLog("Local IP: " + s);
-            }
+        String sIPLocalList=getString(R.string.ip_default_address);
+        mRemoteDevice = (EditText) findViewById(R.id.remote_device);
+        //if Wifi
+        if(ipPrintFile.isNetworkOnline(this)){
+            sIPLocalList=getLocalIpAddress();
         }
+        mRemoteDevice.setText(sIPLocalList);
     }
 
 
@@ -256,16 +242,17 @@ public class IpPrint4 extends Activity {
     public void toggleWiFi(boolean status) {
         WifiManager wifiManager = (WifiManager) this
                 .getSystemService(Context.WIFI_SERVICE);
-        if (status == true && !wifiManager.isWifiEnabled()) {
+        if (status && !wifiManager.isWifiEnabled()) {
             wifiManager.setWifiEnabled(true);
-        } else if (status == false && wifiManager.isWifiEnabled()) {
+        } else if (status && wifiManager.isWifiEnabled()) {
             wifiManager.setWifiEnabled(false);
         }
     }
 
-    public List<String> getLocalIpAddress()
+    public String getLocalIpAddress()
     {
-        List<String> ipList=new ArrayList<String>();
+        String firstIP="192.168.0.1";
+        ArrayList<String> ipList=new ArrayList<String>();
         try
         {
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements();)
@@ -287,7 +274,21 @@ public class IpPrint4 extends Activity {
         {
             Log.e(TAG, ex.toString());
         }
-        return ipList;
+
+        int firstIP4=-1;
+        for (int i=0; i<ipList.size(); i++){// String s : ipList){
+            if (ipList.get(i).indexOf("%") != -1) {
+                //IP6 address
+                ;
+            } else {
+                firstIP4=i;
+                addLog("Local IP: " + ipList.get(i));
+            }
+        }
+        if(firstIP4!=-1){
+            firstIP=ipList.get(firstIP4);
+        }
+        return firstIP;
     }
 
     void readPrintFileDescriptions() {
@@ -467,6 +468,10 @@ public class IpPrint4 extends Activity {
         //startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
 
         Intent serverIntent = new Intent(this, ipListActivity.class);
+        Bundle bundle=new Bundle();
+        String sIP= String.valueOf(mRemoteDevice.getText());
+        bundle.putString("startip", sIP);
+        serverIntent.putExtras(bundle);
         startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
     }
 

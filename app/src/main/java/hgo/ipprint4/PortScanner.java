@@ -97,13 +97,15 @@ public class PortScanner implements Runnable{
             if( !backgroundThread.interrupted() ) {
                 doLog("thread: starting discovery...");
                 startDiscovery1();
-                //wait for finish
+                //wait for finish?
+/*
                 Thread.sleep(1000);
                 doLog("thread: waiting for finish...");
                 while(state!=state.idle) {
                     Thread.sleep(1000);
                 }
                 doLog("thread: wait finished");
+*/
                 /*
                 //scanning 250 addresses with 200ms each will take 50 seconds if done one by one!
                 for (int ip1=1; ip1<=254; ip1++){

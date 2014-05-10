@@ -11,6 +11,7 @@ import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -36,12 +37,19 @@ public class ipListActivity extends Activity {
 
     PortScanner portScanner;
 
+    EditText mRemoteDeviceIP;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
 
         addLog("+++OnCreate+++");
+
+        //retrive argument
+        Bundle bundle=getIntent().getExtras();
+        String sStartIP=bundle.getString("startip");
+
         // Setup the window
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
         setContentView(R.layout.ip_list);
@@ -57,7 +65,11 @@ public class ipListActivity extends Activity {
         hostsListView.setAdapter(mRemotesArrayAdapter);
         hostsListView.setOnItemClickListener(mDeviceClickListener);
 
-        portScanner=new PortScanner(mHandler, "192.168.128.1");
+        //find and set the editbox for the remote device
+        mRemoteDeviceIP=(EditText)findViewById(R.id.remote_device);
+
+        String sIP = sStartIP;
+        portScanner=new PortScanner(mHandler, sIP);
 
         portScanner.startDiscovery();
 
