@@ -38,6 +38,7 @@ public class ipListActivity extends Activity {
     PortScanner portScanner;
 
     EditText mRemoteDeviceIP;
+    String sStartIP="";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,7 +49,7 @@ public class ipListActivity extends Activity {
 
         //retrive argument
         Bundle bundle=getIntent().getExtras();
-        String sStartIP=bundle.getString("startip");
+        sStartIP=bundle.getString("startip");
 
         // Setup the window
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS);
@@ -65,14 +66,6 @@ public class ipListActivity extends Activity {
         hostsListView.setAdapter(mRemotesArrayAdapter);
         hostsListView.setOnItemClickListener(mDeviceClickListener);
 
-        //find and set the editbox for the remote device
-        mRemoteDeviceIP=(EditText)findViewById(R.id.remote_device);
-
-        String sIP = sStartIP;
-        portScanner=new PortScanner(mHandler, sIP);
-
-        portScanner.startDiscovery();
-
         // Initialize the button to perform device discovery
         scanButtonTextScan=getResources().getString(R.string.devicelist_action_button_text_scan);
         scanButtonTextStop=getResources().getString(R.string.devicelist_action_button_text_cancel);
@@ -83,21 +76,37 @@ public class ipListActivity extends Activity {
             public void onClick(View view) {
                 if(portScanner.state== PortScanner.eState.finished || portScanner.state== PortScanner.eState.idle) {
                     mRemotesArrayAdapter.clear();
-                    portScanner.startDiscovery();
+                    startDiscovery();
                 }
                 else if (portScanner.state== PortScanner.eState.running)
-                    portScanner.cancelDiscovery();
+                    stopDiscovery();
             }
         });
 
+        startDiscovery();
     }
 
+    void startDiscovery(){
+        if(portScanner!=null) {
+            portScanner.cancelDiscovery();
+            portScanner = null;
+        }
+        portScanner = new PortScanner(mHandler, sStartIP);
+        portScanner.startDiscovery();
+    }
+    void stopDiscovery(){
+        if(portScanner!=null){
+            portScanner.cancelDiscovery();
+            portScanner=null;
+        }
+    }
     // The on-click listener for all devices in the ListViews
     private AdapterView.OnItemClickListener mDeviceClickListener = new AdapterView.OnItemClickListener() {
         public void onItemClick(AdapterView<?> av, View v, int arg2, long arg3) {
             addLog("OnItemClickListener()");
+
             // Cancel discovery because it's costly and we're about to connect
-            portScanner.cancelDiscovery();
+            stopDiscovery();
 
             // Get the device MAC address, which is the last 17 chars in the View
             String address = ((TextView) v).getText().toString();

@@ -41,7 +41,7 @@ public class PortScanner implements Runnable{
     int port=9100;
     boolean bValidIP=false;
 
-    //contructor
+    //constructor
     PortScanner(Handler handler, String startIP){
         mHandler=handler;
         m_sStartIP=startIP;
@@ -94,7 +94,7 @@ public class PortScanner implements Runnable{
             doLog("thread: starting...");
             msg=mHandler.obtainMessage(msgTypes.started);
             mHandler.sendMessage(msg);
-            if( !backgroundThread.interrupted() ) {
+            if( true) { //!backgroundThread.interrupted() ) {
                 doLog("thread: starting discovery...");
                 startDiscovery1();
                 //wait for finish?
@@ -153,7 +153,7 @@ public class PortScanner implements Runnable{
         }
         doLog("startDiscovery END");
     }
-    public void start() {
+    void start() {
         doLog("start()...");
         if( backgroundThread == null ) {
             doLog("start: backgroundThread == null");
@@ -169,7 +169,7 @@ public class PortScanner implements Runnable{
         this.stop();
         doLog("cancelDiscovery() END");
     }
-    public void stop() {
+    void stop() {
         doLog("stop()...");
         cancelDiscovery1();
         if( backgroundThread != null ) {
@@ -202,7 +202,7 @@ public class PortScanner implements Runnable{
     }
 
 
-    public static Future<ScanResult> portIsOpen(final ExecutorService es, final String ip, final int port, final int timeout) {
+    static Future<ScanResult> portIsOpen(final ExecutorService es, final String ip, final int port, final int timeout) {
         return es.submit(new Callable<ScanResult>() {
             @Override public ScanResult call() {
                 try {
@@ -217,7 +217,7 @@ public class PortScanner implements Runnable{
         });
     }
 
-    public void cancelDiscovery1(){
+    void cancelDiscovery1(){
         doLog("cancelDiscovery1()...");
         if(state==eState.idle) {
             doLog("cancelDiscovery1: abort as state!=idle");
@@ -253,7 +253,7 @@ public class PortScanner implements Runnable{
         doLog("cancelDiscovery1: END");
     }
 
-    public void startDiscovery1(){
+    synchronized void startDiscovery1(){
         doLog("startDiscovery1()...");
 //        if(state!=eState.idle)
 //            return;

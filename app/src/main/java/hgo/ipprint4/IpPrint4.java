@@ -109,7 +109,10 @@ public class IpPrint4 extends Activity {
         mConnectButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
-                connectToDevice();
+                if(ipPrintService.getState() == ipPrintFile.STATE_CONNECTED)
+                    disconnectDevice();
+                else
+                    connectToDevice(mRemoteDevice.getText().toString());
             }
         });
 
@@ -120,6 +123,7 @@ public class IpPrint4 extends Activity {
         mBtnExit.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View arg0) {
+                disconnectDevice();
                 finish();
                 return;
             }
@@ -130,6 +134,7 @@ public class IpPrint4 extends Activity {
         mBtnScan.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
+                disconnectDevice();
                 startDiscovery();
             }
         });
@@ -172,6 +177,11 @@ public class IpPrint4 extends Activity {
         //if Wifi
         if(ipPrintFile.isNetworkOnline(this)){
             sIPLocalList=getLocalIpAddress();
+        }
+        else{
+            myToast("ipPrint4: Can not continue without TCP/IP. Please enable WLAN and get a working connection.");
+            finish();
+            return;
         }
         mRemoteDevice.setText(sIPLocalList);
     }
@@ -629,14 +639,24 @@ public class IpPrint4 extends Activity {
         }
     };
 
-    void connectToDevice() {
-        String remote = mRemoteDevice.getText().toString();
-        if (remote.length() == 0)
+    void disconnectDevice(){
+        if(ipPrintService==null)
             return;
         if (ipPrintService.getState() == ipPrintFile.STATE_CONNECTED) {
             ipPrintService.stop();
             setConnectState(ipPrintFile.STATE_DISCONNECTED);
+            //return;
+        }
+    }
+    void connectToDevice(String remote) {
+        //String remote = mRemoteDevice.getText().toString();
+        if (remote.length() == 0)
             return;
+        //disconnect first
+        if (ipPrintService.getState() == ipPrintFile.STATE_CONNECTED) {
+            ipPrintService.stop();
+            setConnectState(ipPrintFile.STATE_DISCONNECTED);
+            //return;
         }
 
         InetAddress iAddress;
@@ -655,7 +675,7 @@ public class IpPrint4 extends Activity {
         }
     }
 
-    void connectToDevice(String _device) {
+    void connectToDevice1(String _device) {
         if (_device != null) {
             addLog("connecting to " + _device);
             ipPrintService.connect(_device);
@@ -695,11 +715,15 @@ public class IpPrint4 extends Activity {
                 // When DeviceListActivity returns with a device to connect
                 if (resultCode == Activity.RESULT_OK) {
                     addLog("resultCode==OK");
-                    // Get the device MAC address
-                    String address = mRemoteDevice.getText().toString();
+                    // Get the device address
+
+                    String address = data.getExtras().getString("host");// mRemoteDevice.getText().toString();
+                    addLog("iplist OK with '"+address+"'");
+                    mRemoteDevice.setText(address);
                     // Attempt to connect to the device
                     addLog("onActivityResult: connecting device...");
                     //ipPrintService.connect(device);
+                    //disconnect existing connection?
                     connectToDevice(address);
                 }
                 bDiscoveryStarted = false;
