@@ -15,7 +15,9 @@ import java.util.concurrent.TimeoutException;
 
 import android.annotation.TargetApi;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
@@ -23,6 +25,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 /**
  * Created by hgode on 04.04.2014.
@@ -46,7 +49,65 @@ public class ipPrintFile {
         addText("ipPrintFile initialized 1");
     }
 
+    static boolean mDialogResult=false;
+    public static boolean myDialog(Context context) {
+        DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+            //@Override
+            public void onClick(DialogInterface dialog, int which) {
+                switch (which){
+                    case DialogInterface.BUTTON_POSITIVE:
+                        //Do your Yes progress
+                        mDialogResult=true;// mDeleted = mContext.deleteFile(mFilePath.toString());
+                        Log.i(TAG,"OK selected");
+                        break;
+
+                    case DialogInterface.BUTTON_NEGATIVE:
+                        //Do your No progress
+                        mDialogResult=false;//mDeleted = false;
+                        Log.i(TAG,"Cancel selected");
+                        break;
+                }
+            }
+        };
+        AlertDialog.Builder ab = new AlertDialog.Builder(context);
+        ab.setMessage("Use WWAN connection?")
+                .setTitle("no WLAN connection found")
+                .setPositiveButton("Yes", dialogClickListener)
+                .setNegativeButton("Cancel", dialogClickListener)
+                .show();
+        return mDialogResult;
+    }
+
     public static boolean isNetworkOnline(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        if (cm.getActiveNetworkInfo() != null
+                && cm.getActiveNetworkInfo().isAvailable()
+                && cm.getActiveNetworkInfo().isConnected()) {
+            // so far we have a network and it's available
+            // we now need to see if it's wifi or mobile
+            NetworkInfo[] netInfo = cm.getAllNetworkInfo();
+            for (NetworkInfo ni : netInfo) {
+                if (ni.getTypeName().equalsIgnoreCase("WIFI") && ni.isConnected())
+                    return true; // WIFI that's ok
+                if (ni.getTypeName().equalsIgnoreCase("MOBILE") && ni.isConnected())
+                {
+                    //ask user about WWAN usage
+                    boolean bUseWWAN=false;
+                    bUseWWAN = myDialog(context);
+                    Log.d( TAG, "Mobile connection found");
+                    Toast.makeText(context, "Using WAN connection", Toast.LENGTH_LONG); //getString(R.string.Warning)); // ok so warn about charges
+                    return true;
+                }
+            }
+            //Toast.makeText(context, "No known network connection found", Toast.LENGTH_LONG); //getString(R.string.Warning)); // ok so warn about charges
+            Log.i( TAG, "no Connection found");
+            return false;
+        } else {
+            android.util.Log.d( TAG, "Internet Connection Not Present");
+            return false;
+        }
+        /*
         boolean status=false;
         try{
             ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -63,6 +124,7 @@ public class ipPrintFile {
             return false;
         }
         return status;
+        */
     }
 
     // init a new btPrint with a conext for callbacks
