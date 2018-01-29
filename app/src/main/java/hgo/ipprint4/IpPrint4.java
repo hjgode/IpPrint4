@@ -1,9 +1,9 @@
 package hgo.ipprint4;
 
-import java.lang.reflect.Array;
+import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.Socket;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -33,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.List;
 
 public class IpPrint4 extends Activity {
     ipPrintFile ipPrintService = null;
@@ -48,8 +47,9 @@ public class IpPrint4 extends Activity {
     TextView mLog = null;
     Button mBtnExit = null;
     Button mBtnScan = null;
+    Button mBtnBrowseForFile = null;
 
-    Button mBtnSelectFile;
+    Button mBtnSelectDemoFile;
     TextView mTxtFilename;
     Button mBtnPrint;
     PrintFileXML printFileXML = null;
@@ -64,10 +64,11 @@ public class IpPrint4 extends Activity {
     private static final int REQUEST_CONNECT_DEVICE = 1;
     private static final int REQUEST_ENABLE_BT = 2;
 
-    // Intent request codes for files list
-    private static final int REQUEST_SELECT_FILE = 3;
-
+    // Intent request codes for demo files list
+    private static final int REQUEST_SELECT_DEMO_FILE = 3;
     //BluetoothAdapter mBluetoothAdapter = null;
+    // Intent request codes for files list
+    private static final int REQUEST_SELECT_FILE = 4;
 
     View _view;
 
@@ -139,11 +140,19 @@ public class IpPrint4 extends Activity {
             }
         });
 
-        mBtnSelectFile = (Button) findViewById(R.id.btnSelectFile);
-        mBtnSelectFile.setOnClickListener(new OnClickListener() {
+        mBtnSelectDemoFile = (Button) findViewById(R.id.btnSelectDemo);
+        mBtnSelectDemoFile.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
                 startFileList();
+            }
+        });
+
+        mBtnBrowseForFile=(Button)findViewById(R.id.idFileBtn);
+        mBtnBrowseForFile.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startFileBrowser();
             }
         });
 
@@ -250,14 +259,14 @@ public class IpPrint4 extends Activity {
     }
 
     public void toggleWiFi(boolean status) {
-        WifiManager wifiManager = (WifiManager) this
-                .getSystemService(Context.WIFI_SERVICE);
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (status && !wifiManager.isWifiEnabled()) {
             wifiManager.setWifiEnabled(true);
         } else if (status && wifiManager.isWifiEnabled()) {
             wifiManager.setWifiEnabled(false);
         }
     }
+
 
     public String getLocalIpAddress()
     {
@@ -356,7 +365,15 @@ public class IpPrint4 extends Activity {
             Integer totalWrite = 0;
             StringBuffer sb = new StringBuffer();
             try {
-                inputStream = this.getAssets().open(fileName);
+                //TODO: test if this is a storage file or a Assets resource file?
+                if(fileName.startsWith("/")){
+                    inputStream = new FileInputStream(fileName);
+                    addLog("Using regular file: '"+fileName+"'");
+                }
+                else {
+                    inputStream = this.getAssets().open(fileName);
+                    addLog("Using demo file: '"+fileName+"'");
+                }
 
                 byte[] buf = new byte[2048];
                 int readCount = 0;
@@ -485,15 +502,27 @@ public class IpPrint4 extends Activity {
         startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
     }
 
-    boolean bFileListStared = false;
-
+    boolean bDemoFileListStarted = false;
     void startFileList() {
-        if (bFileListStared)
+        if (bDemoFileListStarted)
             return;
-        bFileListStared = true;
+        bDemoFileListStarted = true;
         Intent fileListerIntent = new Intent(this, FileListActivity.class);
-        startActivityForResult(fileListerIntent, REQUEST_SELECT_FILE);
+        startActivityForResult(fileListerIntent, REQUEST_SELECT_DEMO_FILE);
     }
+
+    boolean bFileBrowserStarted=false;
+    void startFileBrowser(){
+        if(bFileBrowserStarted)
+            return;
+        bFileBrowserStarted=true;
+//        Intent fileBrowserIntent = new Intent(this, FileexplorerActivity.class);
+//        //Intent fileBrowserIntent = new Intent(this, FileBrowserActivity.class);
+//        startActivityForResult(fileBrowserIntent, REQUEST_SELECT_DEMO_FILE);
+        Intent intent1 = new Intent(this, hgo.ipprint4.FileChooser.class);
+        startActivityForResult(intent1, REQUEST_SELECT_FILE);
+    }
+
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -690,7 +719,21 @@ public class IpPrint4 extends Activity {
         if (D) Log.d(TAG, "onActivityResult " + resultCode);
         switch (requestCode) {
             case REQUEST_SELECT_FILE:
-                addLog("onActivityResult: requestCode==REQUEST_SELECT_FILE");
+                if (resultCode == RESULT_OK) {
+                    String curFileName = data.getStringExtra("GetFileName");
+                    String curPath = data.getStringExtra("GetPath");
+                    if(!curPath.endsWith("/")) {
+                        curPath += "/";
+                    }
+                    String fullName=curPath+curFileName;
+                    mTxtFilename.setText(fullName);
+                    addLog("Filebrowser Result_OK: '"+fullName+"'");
+                }
+                bFileBrowserStarted=false;
+                break;
+
+            case REQUEST_SELECT_DEMO_FILE:
+                addLog("onActivityResult: requestCode==REQUEST_SELECT_DEMO_FILE");
                 // When DeviceListActivity returns with a device to connect
                 if (resultCode == Activity.RESULT_OK) {
                     addLog("resultCode==OK");
@@ -708,7 +751,7 @@ public class IpPrint4 extends Activity {
                     //mRemoteDevice.setText(device.getAddress());
                     // Attempt to connect to the device
                 }
-                bFileListStared = false;
+                bDemoFileListStarted = false;
                 break;
             case REQUEST_CONNECT_DEVICE:    //called from List activity with new device/host address
                 addLog("onActivityResult: requestCode==REQUEST_CONNECT_DEVICE");
