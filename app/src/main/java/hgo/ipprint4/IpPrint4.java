@@ -5,7 +5,10 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.net.wifi.WifiManager;
@@ -178,9 +181,10 @@ public class IpPrint4 extends Activity {
         //read file descriptions
         readPrintFileDescriptions();
 
-        //is wifi enabled
-        if (!ipPrintFile.isNetworkOnline(this))
+        //is wifi enabled, changed to use AlertDialog
+/*        if (!ipPrintFile.isNetworkOnline(this))
             toggleWiFi(true);
+*/
         String sIPLocalList=getString(R.string.ip_default_address);
         mRemoteDevice = (EditText) findViewById(R.id.remote_device);
         //if Wifi
@@ -189,12 +193,33 @@ public class IpPrint4 extends Activity {
         }
         else{
             myToast("ipPrint4: Can not continue without TCP/IP. Please enable WLAN and get a working connection.");
-            finish();
-            return;
+            showAlertNoIP();
+//            return;
         }
         mRemoteDevice.setText(sIPLocalList);
     }
 
+    void showAlertNoIP(){
+        AlertDialog alertDialog = new AlertDialog.Builder(IpPrint4.this).create();
+        alertDialog.setTitle("No IP available");
+        alertDialog.setMessage("Can not continue without a valid local IP stack!");
+        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "EXIT",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        finish();
+                    }
+                });
+        alertDialog.setButton(AlertDialog.BUTTON_POSITIVE, "WiFi ON",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        toggleWiFi(true);
+                    }
+                });
+
+        alertDialog.show();
+    }
 
     @Override
     public void onStart() {
@@ -537,10 +562,26 @@ public class IpPrint4 extends Activity {
             case R.id.mnuFilelist:
                 startFileList();
                 return true;
+            case R.id.mnuAbout:
+                showAboutScreen();
+                return true;
         }
         return false;
     }
 
+    void showAboutScreen(){
+        AlertDialog alertDialog = new AlertDialog.Builder(IpPrint4.this).create();
+        alertDialog.setTitle("About");
+        String sVersion = getResources().getString(R.string.versionstring);;
+        alertDialog.setMessage(sVersion);
+        alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                });
+        alertDialog.show();
+    }
     void printESCP() {
         if (ipPrintService != null) {
             if (ipPrintService.getState() == ipPrintFile.STATE_CONNECTED) {

@@ -23,4 +23,6 @@
     <item android:id="@+id/mnuFilelist"
         android:icon="@android:drawable/ic_menu_mylocation"
         android:title="@string/filelistmenu" />
-</menu>
+    <item android:id="@+id/mnuAbout"
+        android:icon="@android:drawable/ic_menu_mylocation"
+        android:title="@string/aboutmenuitemtext" /></menu>
